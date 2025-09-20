@@ -6,6 +6,10 @@ let gameStarted = false;
 let gameOver = false;
 let score = 0;
 let gameSpeed = 0.1;
+let stick = null;
+let stickAnimation = { active: false, progress: 0 };
+let cameraShake = { active: false, intensity: 0, duration: 0 };
+let particles = [];
 
 // Input handling
 const keys = {
@@ -55,6 +59,9 @@ function init() {
     // Create player
     createPlayer();
 
+    // Create stick
+    createStick();
+
     // Set up event listeners
     setupEventListeners();
 
@@ -86,6 +93,32 @@ function createPlayer() {
     player.position.set(0, 1, 10);
     player.castShadow = true;
     scene.add(player);
+}
+
+function createStick() {
+    // Create a stick/club shape using a cylinder
+    const handleGeometry = new THREE.CylinderGeometry(0.1, 0.1, 3, 8);
+    const handleMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown color
+    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+    
+    // Create the club head (larger part)
+    const headGeometry = new THREE.CylinderGeometry(0.3, 0.15, 1, 8);
+    const headMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 }); // Darker brown
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 2; // Position at the top of the handle
+    
+    // Group the stick parts together
+    stick = new THREE.Group();
+    stick.add(handle);
+    stick.add(head);
+    
+    // Position the stick above and behind the scene (hidden initially)
+    stick.position.set(0, 15, 5);
+    stick.rotation.z = Math.PI / 4; // Slight angle
+    stick.visible = false; // Hidden by default
+    stick.castShadow = true;
+    
+    scene.add(stick);
 }
 
 function createObstacle(x, z) {
@@ -266,7 +299,13 @@ function checkCollisions() {
     obstacles.forEach(obstacle => {
         const distance = playerPos.distanceTo(obstacle.position);
         if (distance < 2) {
-            endGame();
+            // Start the stick hitting animation before ending game
+            startStickAnimation();
+            
+            // Delay game over to show the animation
+            setTimeout(() => {
+                endGame();
+            }, 1200); // Wait for animation to complete
         }
     });
     
@@ -287,6 +326,133 @@ function updateScore() {
     document.getElementById('score').textContent = `Score: ${score}`;
 }
 
+function startStickAnimation() {
+    if (stickAnimation.active) return; // Don't start if already active
+    
+    stickAnimation.active = true;
+    stickAnimation.progress = 0;
+    stick.visible = true;
+    
+    // Position stick above the player
+    stick.position.x = player.position.x;
+    stick.position.y = 15;
+    stick.position.z = player.position.z;
+    stick.rotation.z = Math.PI / 4; // Starting angle
+}
+
+function startCameraShake(intensity = 0.5, duration = 0.3) {
+    cameraShake.active = true;
+    cameraShake.intensity = intensity;
+    cameraShake.duration = duration;
+    cameraShake.timer = 0;
+}
+
+function createImpactParticles(position) {
+    const particleCount = 15;
+    for (let i = 0; i < particleCount; i++) {
+        const geometry = new THREE.SphereGeometry(0.1, 4, 4);
+        const material = new THREE.MeshLambertMaterial({ 
+            color: new THREE.Color().setHSL(Math.random() * 0.1 + 0.05, 1, 0.5) // Orange/red colors
+        });
+        const particle = new THREE.Mesh(geometry, material);
+        
+        particle.position.copy(position);
+        particle.position.y += 2; // Start above player's head
+        
+        // Random velocity
+        particle.userData = {
+            velocity: new THREE.Vector3(
+                (Math.random() - 0.5) * 8,
+                Math.random() * 5 + 2,
+                (Math.random() - 0.5) * 8
+            ),
+            life: 1.0,
+            decay: 0.02
+        };
+        
+        scene.add(particle);
+        particles.push(particle);
+    }
+}
+
+function updateParticles() {
+    particles.forEach((particle, index) => {
+        // Update position
+        particle.position.add(particle.userData.velocity);
+        
+        // Apply gravity
+        particle.userData.velocity.y -= 0.2;
+        
+        // Fade out
+        particle.userData.life -= particle.userData.decay;
+        particle.material.opacity = particle.userData.life;
+        
+        // Remove when faded
+        if (particle.userData.life <= 0) {
+            scene.remove(particle);
+            particles.splice(index, 1);
+        }
+    });
+}
+
+function updateStickAnimation() {
+    if (!stickAnimation.active) return;
+    
+    // Animation duration and speed
+    const animationSpeed = 0.08;
+    stickAnimation.progress += animationSpeed;
+    
+    if (stickAnimation.progress <= 1) {
+        // Phase 1: Stick swings down to hit the player
+        const t = stickAnimation.progress;
+        
+        // Smooth easing function (ease-in-out)
+        const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        
+        // Move stick down towards player's head
+        stick.position.y = 15 - (10 * easedT); // From y=15 to y=5
+        stick.rotation.z = (Math.PI / 4) - (Math.PI / 2 * easedT); // Rotate to hit
+        
+        // At impact point, make player "react" and add effects
+        if (t > 0.7 && t < 0.9) {
+            // Make player shake/bounce slightly
+            player.position.y = 1 + Math.sin(t * 50) * 0.1;
+            player.rotation.x = Math.sin(t * 40) * 0.1;
+            player.rotation.z = Math.sin(t * 30) * 0.1;
+            
+            // Trigger impact effects at the peak of impact (once)
+            if (t > 0.78 && t < 0.82 && !stickAnimation.impactTriggered) {
+                startCameraShake(0.8, 0.4);
+                createImpactParticles(player.position);
+                stickAnimation.impactTriggered = true;
+            }
+        }
+        
+    } else if (stickAnimation.progress <= 1.5) {
+        // Phase 2: Stick moves away
+        const t = (stickAnimation.progress - 1) * 2; // 0 to 1
+        stick.position.y = 5 + (15 * t); // Move back up
+        stick.position.x += t * 2; // Move to the side
+        stick.rotation.z = -Math.PI / 4 + (Math.PI * t); // Continue rotation
+        
+        // Reset player position
+        player.position.y = 1;
+        player.rotation.x = 0;
+        player.rotation.z = 0;
+        
+    } else {
+        // Animation complete
+        stickAnimation.active = false;
+        stickAnimation.impactTriggered = false; // Reset for next time
+        stick.visible = false;
+        
+        // Reset player completely
+        player.position.y = 1;
+        player.rotation.x = 0;
+        player.rotation.z = 0;
+    }
+}
+
 function endGame() {
     gameOver = true;
     gameStarted = false;
@@ -299,11 +465,27 @@ function updateCamera() {
     if (!gameStarted) return;
     
     // Follow the player with a smooth camera
-    const targetX = player.position.x * 0.3;
-    const targetZ = player.position.z + 15;
+    let targetX = player.position.x * 0.3;
+    let targetZ = player.position.z + 15;
+    let targetY = camera.position.y;
+    
+    // Add camera shake effect
+    if (cameraShake.active) {
+        cameraShake.timer += 0.016; // Approximate frame time
+        
+        if (cameraShake.timer < cameraShake.duration) {
+            const shakeAmount = cameraShake.intensity * (1 - cameraShake.timer / cameraShake.duration);
+            targetX += (Math.random() - 0.5) * shakeAmount;
+            targetY += (Math.random() - 0.5) * shakeAmount;
+            targetZ += (Math.random() - 0.5) * shakeAmount;
+        } else {
+            cameraShake.active = false;
+        }
+    }
     
     camera.position.x += (targetX - camera.position.x) * 0.05;
     camera.position.z += (targetZ - camera.position.z) * 0.05;
+    camera.position.y += (targetY - camera.position.y) * 0.05;
     
     camera.lookAt(player.position.x, 0, player.position.z - 5);
 }
@@ -319,6 +501,8 @@ function animate() {
     
     updatePlayerMovement();
     updateGameObjects();
+    updateStickAnimation();
+    updateParticles();
     checkCollisions();
     updateCamera();
     
