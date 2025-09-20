@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    background: linear-gradient(135deg, #87CEEB, #4682B4); /* Sky blue gradient */
     overflow: hidden;
     height: 100vh;
 }

@@ -27,7 +27,7 @@ const keys = {
 function init() {
     // Create scene
     scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x000033, 50, 200);
+    scene.fog = new THREE.Fog(0x87CEEB, 30, 150); // Sky blue fog for city atmosphere
 
     // Create camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -37,7 +37,7 @@ function init() {
     // Create renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000033);
+    renderer.setClearColor(0x87CEEB); // Sky blue background
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('gameContainer').appendChild(renderer.domElement);
@@ -70,20 +70,145 @@ function init() {
 }
 
 function createGround() {
-    const groundGeometry = new THREE.PlaneGeometry(100, 200);
-    const groundMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x333333,
-        transparent: true,
-        opacity: 0.8
+    // Create main road surface
+    const roadGeometry = new THREE.PlaneGeometry(20, 200);
+    const roadMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x333333
     });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    const road = new THREE.Mesh(roadGeometry, roadMaterial);
+    road.rotation.x = -Math.PI / 2;
+    road.receiveShadow = true;
+    scene.add(road);
 
-    // Add grid lines for visual effect
-    const gridHelper = new THREE.GridHelper(100, 50, 0x666666, 0x444444);
-    scene.add(gridHelper);
+    // Create sidewalks on both sides
+    const sidewalkGeometry = new THREE.PlaneGeometry(8, 200);
+    const sidewalkMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x666666
+    });
+    
+    // Left sidewalk
+    const leftSidewalk = new THREE.Mesh(sidewalkGeometry, sidewalkMaterial);
+    leftSidewalk.rotation.x = -Math.PI / 2;
+    leftSidewalk.position.x = -14;
+    leftSidewalk.receiveShadow = true;
+    scene.add(leftSidewalk);
+    
+    // Right sidewalk
+    const rightSidewalk = new THREE.Mesh(sidewalkGeometry, sidewalkMaterial);
+    rightSidewalk.rotation.x = -Math.PI / 2;
+    rightSidewalk.position.x = 14;
+    rightSidewalk.receiveShadow = true;
+    scene.add(rightSidewalk);
+
+    // Create road markings (white lines)
+    createRoadMarkings();
+    
+    // Create street elements
+    createStreetElements();
+}
+
+function createRoadMarkings() {
+    // Center line (continuous)
+    const centerLineGeometry = new THREE.PlaneGeometry(0.3, 200);
+    const centerLineMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0xffffff
+    });
+    const centerLine = new THREE.Mesh(centerLineGeometry, centerLineMaterial);
+    centerLine.rotation.x = -Math.PI / 2;
+    centerLine.position.y = 0.01; // Slightly above road
+    scene.add(centerLine);
+
+    // Dashed lines for lanes
+    for (let z = -100; z < 100; z += 8) {
+        // Left lane marking
+        const leftMarkGeometry = new THREE.PlaneGeometry(0.2, 3);
+        const leftMark = new THREE.Mesh(leftMarkGeometry, centerLineMaterial);
+        leftMark.rotation.x = -Math.PI / 2;
+        leftMark.position.set(-5, 0.01, z);
+        scene.add(leftMark);
+
+        // Right lane marking
+        const rightMark = new THREE.Mesh(leftMarkGeometry, centerLineMaterial);
+        rightMark.rotation.x = -Math.PI / 2;
+        rightMark.position.set(5, 0.01, z);
+        scene.add(rightMark);
+    }
+
+    // Road edges (solid white lines)
+    const edgeGeometry = new THREE.PlaneGeometry(0.2, 200);
+    
+    // Left edge
+    const leftEdge = new THREE.Mesh(edgeGeometry, centerLineMaterial);
+    leftEdge.rotation.x = -Math.PI / 2;
+    leftEdge.position.set(-10, 0.01, 0);
+    scene.add(leftEdge);
+    
+    // Right edge
+    const rightEdge = new THREE.Mesh(edgeGeometry, centerLineMaterial);
+    rightEdge.rotation.x = -Math.PI / 2;
+    rightEdge.position.set(10, 0.01, 0);
+    scene.add(rightEdge);
+}
+
+function createStreetElements() {
+    // Create street lamps
+    for (let z = -80; z < 100; z += 40) {
+        createStreetLamp(-18, z);
+        createStreetLamp(18, z);
+    }
+    
+    // Create buildings in the background
+    createBuildings();
+}
+
+function createStreetLamp(x, z) {
+    // Lamp post
+    const postGeometry = new THREE.CylinderGeometry(0.1, 0.1, 8, 8);
+    const postMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+    const post = new THREE.Mesh(postGeometry, postMaterial);
+    post.position.set(x, 4, z);
+    post.castShadow = true;
+    scene.add(post);
+
+    // Lamp head
+    const lampGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+    const lampMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0xffffaa,
+        emissive: 0x222200
+    });
+    const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
+    lamp.position.set(x, 8.5, z);
+    scene.add(lamp);
+
+    // Add point light
+    const light = new THREE.PointLight(0xffffaa, 0.3, 20);
+    light.position.set(x, 8.5, z);
+    scene.add(light);
+}
+
+function createBuildings() {
+    // Create simple building silhouettes
+    for (let i = 0; i < 10; i++) {
+        const height = Math.random() * 15 + 10;
+        const width = Math.random() * 8 + 4;
+        const depth = Math.random() * 8 + 4;
+        
+        const buildingGeometry = new THREE.BoxGeometry(width, height, depth);
+        const buildingMaterial = new THREE.MeshLambertMaterial({ 
+            color: new THREE.Color().setHSL(0.6, 0.1, Math.random() * 0.3 + 0.2)
+        });
+        const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+        
+        // Position buildings on sides
+        const side = Math.random() > 0.5 ? 1 : -1;
+        building.position.set(
+            side * (25 + Math.random() * 10), 
+            height / 2, 
+            (Math.random() - 0.5) * 150
+        );
+        building.castShadow = true;
+        scene.add(building);
+    }
 }
 
 function createPlayer() {
