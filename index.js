@@ -302,10 +302,10 @@ function checkCollisions() {
             // Start the stick hitting animation before ending game
             startStickAnimation();
             
-            // Delay game over to show the animation
+            // Delay game over to show the animation (longer delay for slower animation)
             setTimeout(() => {
                 endGame();
-            }, 1200); // Wait for animation to complete
+            }, 2400); // Wait for animation to complete
         }
     });
     
@@ -398,8 +398,8 @@ function updateParticles() {
 function updateStickAnimation() {
     if (!stickAnimation.active) return;
     
-    // Animation duration and speed
-    const animationSpeed = 0.08;
+    // Animation duration and speed (slower for more dramatic effect)
+    const animationSpeed = 0.04;
     stickAnimation.progress += animationSpeed;
     
     if (stickAnimation.progress <= 1) {
