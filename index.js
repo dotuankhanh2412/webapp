@@ -212,12 +212,110 @@ function createBuildings() {
 }
 
 function createPlayer() {
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
-    const material = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
-    player = new THREE.Mesh(geometry, material);
-    player.position.set(0, 1, 10);
+    // Create car group
+    player = new THREE.Group();
+    
+    // Car body (main part)
+    const bodyGeometry = new THREE.BoxGeometry(1.8, 0.8, 3.5);
+    const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.8;
+    body.castShadow = true;
+    player.add(body);
+    
+    // Car roof/cabin
+    const roofGeometry = new THREE.BoxGeometry(1.6, 0.6, 2);
+    const roofMaterial = new THREE.MeshLambertMaterial({ color: 0x00cc66 });
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.position.y = 1.5;
+    roof.position.z = -0.3;
+    roof.castShadow = true;
+    player.add(roof);
+    
+    // Windshield (front)
+    const windshieldGeometry = new THREE.PlaneGeometry(1.4, 0.5);
+    const windshieldMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x87CEEB, 
+        transparent: true, 
+        opacity: 0.7 
+    });
+    const windshield = new THREE.Mesh(windshieldGeometry, windshieldMaterial);
+    windshield.position.set(0, 1.6, 0.8);
+    windshield.rotation.x = -Math.PI / 6;
+    player.add(windshield);
+    
+    // Rear window
+    const rearWindow = new THREE.Mesh(windshieldGeometry, windshieldMaterial);
+    rearWindow.position.set(0, 1.6, -1.4);
+    rearWindow.rotation.x = Math.PI / 6;
+    player.add(rearWindow);
+    
+    // Wheels
+    const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 8);
+    const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    
+    // Front wheels
+    const frontLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+    frontLeftWheel.position.set(-1, 0.3, 1.2);
+    frontLeftWheel.rotation.z = Math.PI / 2;
+    frontLeftWheel.castShadow = true;
+    player.add(frontLeftWheel);
+    
+    const frontRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+    frontRightWheel.position.set(1, 0.3, 1.2);
+    frontRightWheel.rotation.z = Math.PI / 2;
+    frontRightWheel.castShadow = true;
+    player.add(frontRightWheel);
+    
+    // Rear wheels
+    const rearLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+    rearLeftWheel.position.set(-1, 0.3, -1.2);
+    rearLeftWheel.rotation.z = Math.PI / 2;
+    rearLeftWheel.castShadow = true;
+    player.add(rearLeftWheel);
+    
+    const rearRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+    rearRightWheel.position.set(1, 0.3, -1.2);
+    rearRightWheel.rotation.z = Math.PI / 2;
+    rearRightWheel.castShadow = true;
+    player.add(rearRightWheel);
+    
+    // Headlights
+    const headlightGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+    const headlightMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0xffffcc,
+        emissive: 0x444400
+    });
+    
+    const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
+    leftHeadlight.position.set(-0.6, 0.9, 1.8);
+    player.add(leftHeadlight);
+    
+    const rightHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
+    rightHeadlight.position.set(0.6, 0.9, 1.8);
+    player.add(rightHeadlight);
+    
+    // Taillights
+    const taillightMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0xff3333,
+        emissive: 0x220000
+    });
+    
+    const leftTaillight = new THREE.Mesh(headlightGeometry, taillightMaterial);
+    leftTaillight.position.set(-0.6, 0.9, -1.8);
+    player.add(leftTaillight);
+    
+    const rightTaillight = new THREE.Mesh(headlightGeometry, taillightMaterial);
+    rightTaillight.position.set(0.6, 0.9, -1.8);
+    player.add(rightTaillight);
+    
+    // Position the car
+    player.position.set(0, 0.5, 10);
     player.castShadow = true;
     scene.add(player);
+    
+    // Store wheel references for animation
+    player.userData.wheels = [frontLeftWheel, frontRightWheel, rearLeftWheel, rearRightWheel];
 }
 
 function createStick() {
@@ -309,7 +407,7 @@ function startGame() {
     clearGameObjects();
     
     // Reset player position
-    player.position.set(0, 1, 10);
+    player.position.set(0, 0.5, 10);
     
     // Generate initial objects
     generateGameObjects();
@@ -354,22 +452,34 @@ function updatePlayerMovement() {
     if (!gameStarted || gameOver) return;
     
     const moveSpeed = 0.3;
-    const boundary = 15;
+    const boundary = 8; // Adjusted for road width
+    let isMoving = false;
     
     // Horizontal movement
     if ((keys.a || keys.ArrowLeft) && player.position.x > -boundary) {
         player.position.x -= moveSpeed;
+        isMoving = true;
     }
     if ((keys.d || keys.ArrowRight) && player.position.x < boundary) {
         player.position.x += moveSpeed;
+        isMoving = true;
     }
     
     // Vertical movement (optional - for 3D movement)
     if ((keys.w || keys.ArrowUp) && player.position.z > 5) {
         player.position.z -= moveSpeed;
+        isMoving = true;
     }
     if ((keys.s || keys.ArrowDown) && player.position.z < 15) {
         player.position.z += moveSpeed;
+        isMoving = true;
+    }
+    
+    // Animate wheels when moving
+    if (isMoving && player.userData.wheels) {
+        player.userData.wheels.forEach(wheel => {
+            wheel.rotation.x += 0.2;
+        });
     }
 }
 
@@ -540,8 +650,8 @@ function updateStickAnimation() {
         
         // At impact point, make player "react" and add effects
         if (t > 0.7 && t < 0.9) {
-            // Make player shake/bounce slightly
-            player.position.y = 1 + Math.sin(t * 50) * 0.1;
+            // Make car shake/bounce slightly
+            player.position.y = 0.5 + Math.sin(t * 50) * 0.1;
             player.rotation.x = Math.sin(t * 40) * 0.1;
             player.rotation.z = Math.sin(t * 30) * 0.1;
             
@@ -561,7 +671,7 @@ function updateStickAnimation() {
         stick.rotation.z = -Math.PI / 4 + (Math.PI * t); // Continue rotation
         
         // Reset player position
-        player.position.y = 1;
+        player.position.y = 0.5;
         player.rotation.x = 0;
         player.rotation.z = 0;
         
@@ -572,7 +682,7 @@ function updateStickAnimation() {
         stick.visible = false;
         
         // Reset player completely
-        player.position.y = 1;
+        player.position.y = 0.5;
         player.rotation.x = 0;
         player.rotation.z = 0;
     }
